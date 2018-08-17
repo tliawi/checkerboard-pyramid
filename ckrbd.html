@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html>
+    
+<!--
+ckrbd.html version 1.1 Aug 16 2018
+
+Copyright 2018 John R C Fairfield
+    
+Put the two files ckrbd.html and ckrbd.js in a folder (directory) and
+open ckrbd.html in the Chrome browser.
+
+-->
+    
+<head>
+    
+<style>
+    
+canvas {
+    margin-right:15px;
+    border:1px solid #d3d3d3;
+    float: left;
+}
+    
+body {
+    font-size:medium;
+    background-color: linen;
+}
+
+</style>
+    
+</head>
+<body>
+
+<p style="font-size: small">
+Be advised, this testbed is not user friendly and has been tested only in Chrome on macOS.<br>
+    
+<div style="max-width:512px;">
+  <div style="float:left" >
+    <a href='#' class='button' id='btn-download' download='ckrbdPic.png'>download picture</a>&nbsp;&nbsp;&nbsp;&nbsp;
+    <span id='msgDiv'></span>
+  </div>
+  <div style="float:right">
+    <span id='mousePos' ></span>
+  </div>
+  <br>
+</div>
+    
+
+<canvas id="imgCanvas" width="512" height="600" >Your browser does not support the HTML5 canvas tag.</canvas>
+
+
+<h2>Checkerboard Pyramid</h2>
+    
+Mode: <select id = 'selectMode', onChange="schedule(this.value);">
+<option value='foot' >footprints</option>
+<option value='head' >headprints</option>
+<option value='dela'>Delaunay-like</option>
+<option value='voro'>Voronoi-like</option>
+</select>
+    
+<p>
+<span style="color:blue;">Newcomers: type an <strong>a</strong>, then a <strong>0</strong>, and then a <strong>5</strong>.</span>
+</p>
+
+<p> <strong>0</strong>: clears picture <br>
+    <strong> 1-9</strong>: adds that many random dots <br>
+    <strong> h</strong>: adds 100 random dots <br>
+    <strong> t</strong>: adds 1000 random dots <br>
+    <strong> click on pic</strong>: adds a dot there<br> 
+    <strong> drag on pic</strong>: adds solid straight line of dots from mouseDown to mouseUp positions<br> <br> 
+    <strong> a</strong>: toggles animated dot wandering<br> 
+    <strong> arrow keys</strong>: move all dots one pixel up/down/left/right.<br>
+    <strong> f </strong>: toggles animation focus between wide and narrow. 
+    <span id = "instructions"></span>
+</p>
+    
+<!--
+<button id="toggleAnimation" type="button" onclick="toggleAnimation()" style="margin-right:50px;">animate</button> 
+-->
+    
+<script src="ckrbd.js" ></script>
+    
+<script>
+var instructions = document.getElementById("instructions");
+
+function schedule(val){
+    document.getElementById('selectMode').blur();
+    if (val == 'foot') footprintsMode();
+    else if (val == 'head') headprintsMode();
+    else if (val == 'dela') DelaunayLikeMode();
+    else if (val == 'voro') VoronoiLikeMode();
+}
+    
+function footprintsMode(){
+    mode = "footprints";
+    instructions.innerHTML = 
+    "<br><strong> &gt;</strong>: increases +level<br> <strong> &lt </strong>: decreases +level";
+    doMode();
+}
+    
+function headprintsMode(){
+    mode = "headprints";
+    instructions.innerHTML = 
+    "<br><strong> &gt;</strong>: increases +level<br> <strong> &lt </strong>: decreases +level";
+    doMode();
+}
+
+function DelaunayLikeMode(){
+    mode = "Delaunay-like";
+    instructions.innerHTML = 
+    "<br>";
+    doMode();
+}
+
+function VoronoiLikeMode(){
+    mode = "Voronoi-like";
+    instructions.innerHTML = 
+    "<br>";
+    doMode();
+}
+    
+function writeMessage(message) {
+    document.getElementById("msgDiv").innerHTML = message;
+}
+
+function writeMousePos(message) {
+    document.getElementById("mousePos").innerHTML = message;
+}
+    
+var plusLevel = 5; var headprintPos= {i: 128, j:128};
+
+function doFootprints(dots){
+    cb.footprints(dots, plusLevel);
+    cb.renderImageToRGBA();
+}
+
+function doHeadprints(dots){
+    cb.headprints(dots,plusLevel);
+    cb.portrayLevel(plusLevel);
+    cb.renderImageToRGBA(1); 
+}
+
+function doDelaunay(dots){
+    cb.delaunay(dots);
+}
+    
+function doVoronoi(dots){
+    cb.voronoi(dots); 
+    cb.renderImageKs();
+}
+   
+
+    
+function doMode(){
+    
+    var didPush = false;
+    
+    //temporarily add mouseMovePos 
+    if (mouseMovePos) {
+        startingCells.push(mouseMovePos);
+        didPush = true;
+    }
+    
+    switch (mode){
+        case "footprints": doFootprints(startingCells); break;
+        case "headprints": doHeadprints(startingCells); break;
+        case "Delaunay-like": doDelaunay(startingCells); break;
+        case "Voronoi-like": doVoronoi(startingCells);  break;
+    }
+    
+    if (didPush) {
+        startingCells.pop();
+    }
+}
+    
+function prefixIJ(prefixStr,cell){
+    return prefixStr + cell.i + "," + cell.j;
+}
+
+function getMousePos(evt) {
+    var rect = myCanvas.getBoundingClientRect();
+    return  {
+      i: Math.floor(evt.clientY - rect.top),
+      j: Math.floor(evt.clientX - rect.left)
+    };
+}
+
+function inCanvas(pos){
+    if (!pos) return false;
+    if (pos.i < 0 || pos.j<0) return false;
+    if (pos.i >= myCanvas.height || pos.j >= myCanvas.width) return false;
+    return true;
+}
+
+window.addEventListener("load", pageFullyLoaded, false);
+
+var cb, myCanvas;
+var startingCells = [{i:0,j:0}]; //startingCells[0] is ignored. Within cb, want all references to dots to be truthy, not 0.
+var spaceToggle = false;
+var shiftFlag = false;
+var animationFlag = false;
+var mode = "footprints";
+var didj = []; //speed vectors for animation
+    
+function setRandomDidj(){
+    didj = [];
+    for (var k=0;k<startingCells.length; k++) didj.push(
+        { i:Math.random()*2-1, j:Math.random()*2-1 } );
+} //magnitude gives probability of change, sign gives in which direction
+    
+function animateOneStep(dchange = 0.02){
+    
+    if (didj.length != startingCells.length)setRandomDidj();
+    
+    //apply first derivative, bouncing off walls to confine to middle third
+    for (var k=1;k<startingCells.length; k++){
+        let pos = startingCells[k];
+        let speed = didj[k];
+        if (speed.i >= 0 && Math.random() < speed.i) pos.i++;
+        else if ( Math.random() < -speed.i) pos.i--;
+        
+        if (speed.j >= 0 && Math.random() < speed.j) pos.j++
+        else if ( Math.random() < -speed.j) pos.j--;
+        
+        if (pos.i < TBMargin) {
+            pos.i++; //= TBMargin; 
+            speed.i = Math.abs(speed.i);
+        }
+        
+        if (pos.j < LRMargin) {
+            pos.j++; //= LRMargin; 
+            speed.j = Math.abs(speed.j);
+        }
+        
+        let iHi = -1+myCanvas.height-TBMargin;
+        let jHi = -1+myCanvas.width-LRMargin;
+        
+        if (pos.i > iHi) { 
+            pos.i--;//= iHi; 
+            speed.i = -Math.abs(speed.i);
+        }
+        if (pos.j > jHi ) { 
+            pos.j--;// = jHi;
+            speed.j = -Math.abs(speed.j);
+        }
+    }
+    
+    //random walk in second derivative
+    for (var i=1;i<startingCells.length; i++){
+        let zot = didj[i]; 
+        zot.i += 2*Math.random()*dchange - dchange;
+        zot.j += 2*Math.random()*dchange - dchange;
+        if (zot.i< -1) zot.i = -1; 
+        if (zot.j< -1) zot.j = -1;
+        if (zot.i> 1) zot.i = 1;
+        if (zot.j> 1) zot.j = 1;
+    }
+
+}
+
+function displace(di,dj){
+    var ii,jj;
+    for (var i=1;i<startingCells.length; i++){
+        var cell = startingCells[i];
+        ii = cell.i+di;
+        if (ii<0 || ii >= myCanvas.height ) ii = cell.i;
+        jj = cell.j+dj;
+        if (jj<0 || jj >= myCanvas.width  ) jj = cell.j;
+        cell.i = ii; 
+        cell.j = jj;
+    };
+    doMode();
+}
+
+var TBMargin = 0; //top and bottom margin constraining animation
+var LRMargin = 0; //left and right margin constraining animation
+    
+function toggleMargins(){
+    if (TBMargin==0){
+        TBMargin = Math.floor(myCanvas.height/4);
+        LRMargin = Math.floor(myCanvas.width/4);
+    }else{
+        TBMargin = 0;
+        LRMargin = 0;
+    }
+}
+
+function randomCellIJ(){
+    return {i: TBMargin + Math.floor(Math.random()*(myCanvas.height-2*TBMargin)), j: LRMargin+Math.floor(Math.random()*(myCanvas.width-2*LRMargin))};
+}
+
+    
+function addRandomDots(n){
+    for (let k=0;k<n;k++)startingCells.push(randomCellIJ());
+    doMode();
+}
+
+//renders startingCells values into a string so when you stop animation on a particularly egregious example, 
+//you can type foo() in the console and copy/paste the result into a text file,
+//so that after modifying code you can retest it on that exact example
+//by setting startingCells in the console to what you got out of foo (minus quotes), and then doing
+//doMode()
+    
+function foo() {
+    var str = "[";
+    startingCells.forEach(cell=>{
+        str = str + "{i:" + cell.i+", j:"+cell.j+"},"});
+    return str + "]";
+}
+
+    
+function mirror(aCell){
+    return { i:aCell.j, j:aCell.i };
+}
+    
+function mirrorStartingCells(){
+    var len = startingCells.length;
+    var mir = [];
+    for (let i = 0; i<len; i++) mir.push( mirror(startingCells[i]));
+    startingCells = mir;
+    doMode();
+}
+
+function onShiftDown(){
+    shiftFlag = true;
+    writeMessage("+level = "+plusLevel);
+    doMode();
+}
+    
+function onShiftUp(){
+    shiftFlag = false;
+    writeMessage("");
+    doMode();
+}
+
+function repeatAnimation(t){
+    animateOneStep();
+    doMode();
+    if (animationFlag) requestAnimationFrame(repeatAnimation);
+}
+            
+function toggleAnimation(){
+    animationFlag = !animationFlag;
+    if (animationFlag) repeatAnimation();
+}
+
+var mouseDownPos = null;
+var mouseMovePos = null; // only used when mouse is up, i.e. not during a drag
+    
+function pageFullyLoaded(e) {
+    
+    var dnldButton = document.getElementById('btn-download');
+    dnldButton.addEventListener('click', function (e) {
+        var dataURL = myCanvas.toDataURL('image/png');
+        dnldButton.href = dataURL;
+    });
+    
+    function mouseDownHandler(evt) {
+        evt.stopPropagation();
+        var temp = getMousePos(evt);
+        if (!inCanvas(temp)) {
+            mouseDownPos = null;
+            console.log("mDn mousePos not in canvas");
+            return;
+        }
+        mouseDownPos = temp;
+        writeMessage(prefixIJ("mDn ",mouseDownPos));
+        writeMousePos(prefixIJ("",mouseDownPos));
+    }
+    
+    function mouseUpHandler(evt) {
+        var mouseUpPos;
+        
+        evt.stopPropagation();
+        if (mouseDownPos == null) {
+            console.log("mUp mouseDownPos null.");
+            return;
+        }
+        var mouseUpPos = getMousePos(evt);
+        if (!inCanvas(mouseUpPos)) {
+            mouseDownPos = null;
+            return;
+        }
+        
+        var tempDn = mouseDownPos;
+        mouseDownPos = null; //lift mouseDownPos asap
+        
+        writeMessage(prefixIJ('dn ',tempDn)+prefixIJ("  up ",mouseUpPos));
+        writeMousePos(prefixIJ("",mouseUpPos));
+        
+        var aLine = cb.stLine(tempDn, mouseUpPos);
+        if (aLine.length < 4) aLine = [mouseUpPos]; // single dot
+        aLine.forEach(dot=> startingCells.push(dot));
+
+        doMode();
+    }
+    
+    //on document, not canvas, so can detect if outside of canvas and set mouseMovePos to null
+    function mouseMoveHandler(evt) {
+        var mmp = getMousePos(evt);
+        if (inCanvas(mmp)){
+            writeMousePos(prefixIJ('',mmp));
+            
+            if (mouseDownPos) {
+                mouseMovePos = null;
+                return; //mouseMoves, doModes, traceProvenance all blocked during drag
+            }
+            
+            if (shiftFlag) { 
+                mouseMovePos = null;
+                doMode();
+                cb.drawNet();
+                cb.traceProvenance(mmp.i,mmp.j); //after doMode and drawNet, recolors parts of them
+                return;//mouseMoves blocked during shift
+            }
+            
+            mouseMovePos = mmp;
+            if (!animationFlag) doMode();
+            
+        } else {
+            mouseMovePos = null;
+            mouseDownPos = null;
+            if (!animationFlag) doMode();
+        }
+        
+        
+    }
+    
+    function keydownListener(event){
+        if      (event.key == ">") { plusLevel++; onShiftDown(); }
+        else if (event.key == "<") { if (plusLevel>0) plusLevel--; onShiftDown(); }
+        else if (event.key == "Shift") onShiftDown();
+    }
+    
+    
+    function keyupListener(event){
+        
+        var digit = parseInt(event.key);
+        
+        if      (event.key == "ArrowRight") { event.stopPropagation(); displace(0, 1);  }
+        else if (event.key == "ArrowLeft")  { event.stopPropagation(); displace(0,-1);  }
+        else if (event.key == "ArrowUp")    { event.stopPropagation(); displace(-1, 0); }
+        else if (event.key == "ArrowDown")  { event.stopPropagation(); displace(1, 0);  }
+        else if (event.key == "Enter") { event.stopPropagation(); animateOneStep(); }
+        else if (event.key == "a") toggleAnimation();
+        else if (0 == digit) { startingCells = [{i:0,j:0}]; doMode(); }
+        else if ( 1 <= digit && digit <= 9) addRandomDots(digit);
+        else if (event.key == "m") mirrorStartingCells();
+        else if (event.key == ' ') spaceToggle = !spaceToggle;
+        else if (event.key == "f") toggleMargins();
+        else if (event.key == "h") addRandomDots(100);
+        else if (event.key == "t") addRandomDots(1000);
+        
+        else if (event.key == "Shift") onShiftUp();
+        
+        return false;
+    }
+    
+    
+    myCanvas = document.getElementById("imgCanvas");
+    
+    document.addEventListener('keyup',keyupListener);
+    document.addEventListener('keydown',keydownListener)
+    
+    document.onpointermove = mouseMoveHandler;
+    
+    myCanvas.onpointerup = mouseUpHandler;
+    myCanvas.onpointerdown = mouseDownHandler;
+    
+    cb = ckrbd(myCanvas);
+    
+    cb.levelTest();
+    
+    toggleMargins();
+    addRandomDots(5);
+    footprintsMode();
+    toggleAnimation();
+    
+}
+    
+/*
+To set up a localhost do
+   cd ckrbd
+   python -m SimpleHTTPServer 8000
+then direct a browser tab to localhost:8000/ckrbd.html
+*/
+    
+</script>
+
+</body>
+</html>
