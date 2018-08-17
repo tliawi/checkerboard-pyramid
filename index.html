@@ -2,12 +2,12 @@
 <html>
     
 <!--
-ckrbd.html version 1.1 Aug 16 2018
+index.html
 
-Copyright 2018 John R C Fairfield
+Copyright 2018 John R C Fairfield, MIT license
     
-Put the two files ckrbd.html and ckrbd.js in a folder (directory) and
-open ckrbd.html in the Chrome browser.
+Put the two files index.html and ckrbd.js in a folder (directory) and
+open index.html in the Chrome browser.
 
 -->
     
@@ -59,7 +59,8 @@ Mode: <select id = 'selectMode', onChange="schedule(this.value);">
 </select>
     
 <p>
-<span style="color:blue;">Newcomers: type an <strong>a</strong>, then a <strong>0</strong>, and then a <strong>5</strong>.</span>
+<span style="color:blue;">Newcomers: type an <strong>a</strong> a couple of times slowly, then 
+    a <strong>0</strong>, and then a <strong>5</strong>. Then change the mode, above.</span>
 </p>
 
 <p> <strong>0</strong>: clears picture <br>
@@ -72,6 +73,10 @@ Mode: <select id = 'selectMode', onChange="schedule(this.value);">
     <strong> arrow keys</strong>: move all dots one pixel up/down/left/right.<br>
     <strong> f </strong>: toggles animation focus between wide and narrow. 
     <span id = "instructions"></span>
+    <br>
+    See discussion in  
+    <a href="https://docs.google.com/document/d/11RjqjuvjJlTw8JSmGqyyEiPCy0nd3gDQn6WKBdxchXw" target="_blank"
+        >The Checkerboard (Quincunx) Pyramid</a>
 </p>
     
 <!--
@@ -477,13 +482,6 @@ function pageFullyLoaded(e) {
     toggleAnimation();
     
 }
-    
-/*
-To set up a localhost do
-   cd ckrbd
-   python -m SimpleHTTPServer 8000
-then direct a browser tab to localhost:8000/ckrbd.html
-*/
     
 </script>
 
