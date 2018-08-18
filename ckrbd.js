@@ -1,7 +1,7 @@
 /*
-chkrbd.js version 1.3 Aug 16 2018
+ckrbd.js
 
-Copyright 2018 John R C Fairfield
+Copyright 2018 John R C Fairfield, MIT License
     
 Download, and put the two files index.html and ckrbd.js in a folder (directory) and
 open index.html in the Chrome browser.
