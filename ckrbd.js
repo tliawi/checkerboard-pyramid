@@ -3,8 +3,8 @@ chkrbd.js version 1.3 Aug 16 2018
 
 Copyright 2018 John R C Fairfield
     
-Download, and put the two files ckrbd.html and ckrbd.js in a folder (directory) and
-open ckrbd.html in the Chrome browser.
+Download, and put the two files index.html and ckrbd.js in a folder (directory) and
+open index.html in the Chrome browser.
 */
 
 // ckrbd creates a checkerboard (quincunx) pyramid covering the canvas, and returns an object of methods
