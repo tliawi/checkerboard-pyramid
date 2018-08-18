@@ -7,7 +7,7 @@ Download, and put the two files ckrbd.html and ckrbd.js in a folder (directory) 
 open ckrbd.html in the Chrome browser.
 */
 
-// ckrbd creates a checkerboard pyramid covering the canvas, and returns an object of methods
+// ckrbd creates a checkerboard (quincunx) pyramid covering the canvas, and returns an object of methods
 // to manipulate and display the pyramid
 function ckrbd(imgCanvas) {
 
