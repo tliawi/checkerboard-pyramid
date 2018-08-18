@@ -1,2 +1,2 @@
-# checkerboard-pyramid
-A study of the checkerboard (quincunx) pyramid data structure
+# quincunx-pyramid
+A study of the quincunx (or checkerboard) pyramid data structure
