@@ -546,16 +546,6 @@ function minD2(i,j,dotKs){
     
     return {d2:mnD2, m:mnM, k:dotKs[mnM]};
 }
- 
-// graph generation
-function linkClosestPair(i,j,dotKs){
-    if (dotKs.length < 2 ) return;
-    var copy = dotKs.slice();
-    var first = minD2(i,j,copy);
-    copy.splice(first.m,1); //remove first.k
-    var second = minD2(i,j,copy);
-    drawLink(first.k,second.k);
-}
 
 
 //assumes kSet a non-empty set of dot indices, like from dotSets
@@ -662,7 +652,8 @@ function closets(i,j,levl) {
     else if (ks.length == 1) pyr[i][j] = ks[0];
     else { 
         pyr[i][j] = -dotSets.length; dotSets.push(ks);
-        linkClosestPair(i,j,ks); 
+        wrap(ks);
+        //linkClosestPair(i,j,ks); 
     }
     
     return ks; //is truthy, could be useful for trace
@@ -1017,9 +1008,32 @@ function drawBetween(i1,j1,i2,j2,rgbString){
 }
 
 function drawLink(k1,k2){
-    drawBetween(dots[k1].i,dots[k1].j,dots[k2].i,dots[k2].j, overrideColor ? overrideColor : 'Black');
+    drawBetween(dots[k1].i,dots[k1].j,dots[k2].i,dots[k2].j,'Black');
 }
+// graph generation
+function linkClosestPair(i,j,dotKs){
+    if (dotKs.length < 2 ) return;
+    var copy = dotKs.slice();
+    var first = minD2(i,j,copy);
+    copy.splice(first.m,1); //remove first.k
+    var second = minD2(i,j,copy);
+    drawLink(first.k,second.k);
+}
+
+//assumes dotKs.length >= 1
+function wrap(dotKs){
+    var firstDot = dots[dotKs[0]];
+    var priorDot = firstDot;
     
+    for (let m = 1; m < dotKs.length; m++){
+        let dot = dots[dotKs[m]];
+        drawBetween(priorDot.i,priorDot.j,dot.i,dot.j,'Black');
+        priorDot = dot;
+    }
+    
+    if (dotKs.length > 2) drawBetween(priorDot.i,priorDot.j,firstDot.i,firstDot.j,'Black');
+       
+}
 
 //assumes image values are integers
 function renderImageKs(){
