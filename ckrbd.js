@@ -1024,8 +1024,6 @@ return {
         stLine: stLine,
         dumpLine:dumpLine,
         sumImage:sumImage,
-        drawCircleNode:drawCircleNode,
-        stepLevelDisplay:stepLevelDisplay,
         testNeighbors:testNeighbors,
         greyLevel:greyLevel,
         portrayLevel:portrayLevel,
