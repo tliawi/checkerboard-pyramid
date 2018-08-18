@@ -652,8 +652,7 @@ function closets(i,j,levl) {
     else if (ks.length == 1) pyr[i][j] = ks[0];
     else { 
         pyr[i][j] = -dotSets.length; dotSets.push(ks);
-        wrap(ks);
-        //linkClosestPair(i,j,ks); 
+        linkClosestPair(i,j,ks); // wrap(ks) produces more links
     }
     
     return ks; //is truthy, could be useful for trace
@@ -945,57 +944,6 @@ function traceProvenance(i,j){
         console.log("trace ",node.i, node.j, level(node.i,node.j), closets(node.i,node.j, level(node.i,node.j)));
         overrideColor = '';
     }
-}
-    
-
-
-function drawCircles(i,j,lev,kidList){
-    if (kidList.length){
-         
-         var hv = hvDistToParent(lev-1); //hv dist between me and my kids
-         var radius = Math.sqrt(d2ToChildren(lev));
-         
-         imgContext.beginPath();
-         imgContext.arc(j,i,radius,0,2*Math.PI);
-         
-         if (lev&1){ //odd, rooky, +
-            imgContext.moveTo(j+hv+3,i); imgContext.lineTo(j+hv-3,i);
-            imgContext.moveTo(j-hv+3,i); imgContext.lineTo(j-hv-3,i);
-            imgContext.moveTo(j,i+hv+3); imgContext.lineTo(j,i+hv-3);
-            imgContext.moveTo(j,i-hv+3); imgContext.lineTo(j,i-hv-3);
-         } else { //even, bishopy, x
-            imgContext.moveTo(j+hv+2,i+hv+2);imgContext.lineTo(j+hv-2,i+hv-2);
-            imgContext.moveTo(j-hv+2,i-hv+2);imgContext.lineTo(j-hv-2,i-hv-2);
-            imgContext.moveTo(j-hv+2,i+hv-2);imgContext.lineTo(j-hv-2,i+hv+2);
-            imgContext.moveTo(j+hv+2,i-hv-2);imgContext.lineTo(j+hv-2,i-hv+2);
-         }
-         
-         kidList.forEach(k => {   //addValTo(pyr[i][j],[])
-             imgContext.moveTo(j,i);
-             imgContext.lineTo(dots[k].j, dots[k].i);
-         });
-         
-         imgContext.strokeStyle = cyclicColor(lev);
-         imgContext.stroke();
-    }
-}
-
-// a visit
-function drawCircleNode(i,j,lev){
-     if (pyr[i][j]){
-         drawCircles(i,j,lev,addValTo(pyr[i][j],[]));
-         return 1;
-     } else return 0;
-}
-    
-function stepLevelDisplay(lev){
-    if (lev <=1)return;
-    clearRGBA();
-    
-    indexALevel(drawCircleNode,lev-1);
-    
-    indexALevel(drawCircleNode,lev);
-    
 }
  
 //rgbString is randomRGBSting(something) or cyclicColor(something) etc
