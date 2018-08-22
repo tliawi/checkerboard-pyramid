@@ -547,20 +547,6 @@ function minD2(i,j,dotKs){
     return {d2:mnD2, m:mnM, k:dotKs[mnM]};
 }
 
-
-//assumes kSet a non-empty set of dot indices, like from dotSets
-//returns one k from kSet of a dot that is closest to i,j
-function closestInSet(i,j,kSet){
-    var kClosest = kSet[0];
-    var d2Closest = d2(i,j,dots[kClosest].i,dots[kClosest].j);
-    for (var m=1;m<kSet.length;m++) {
-        let k = kSet[m];
-        let d2K = d2(i,j,dots[k].i,dots[k].j);
-        if (d2K < d2Closest) { d2Closest = d2K; kClosest = k;}
-    }
-    return kClosest;
-}
-
     
 var overrideColor = ''; //falsy.
 
@@ -593,10 +579,11 @@ The bursting problem: one would like the result from a given dot pattern to be v
 
 //taprootScan starts at level 0 and works up towards topLevel (included).
 //At each level it examines the taproot nearest children at that level,
-//retaining the closest nodes in each sector.
+//retaining the closest nodes in each sector. It quits at topLevel, or at the level one higher than the level at which
+//data is first found, so that all 8 sectors have been examined.
 function taprootScan(i,j,topLevel){
     
-    var sectors = [0,0,0,0,0,0,0,0];
+    var dotKs = [];
     
     function kOfClosest(source){ //returns 0 if content is 0
         
@@ -608,48 +595,42 @@ function taprootScan(i,j,topLevel){
         }
         
         var content = pyr[source.i][source.j];
-        var k = content>=0? content : closestInSet(i,j,dotSets[-content]);
+        var k = content>=0? content : minD2(i,j,dotSets[-content]).k;
         traceDisplay(k);
         return k;
     }
     
-    function closerOf2Ks(k1,k2){
-        if (!k1) return k2; //if both 0, return 0
-        if (!k2) return k1;
-        return minD2(i,j,[k1,k2]).k;
-    }
-
     //Level 0 gets special treatment because sources are all in image, not pyr
     cellChildren(i,j).forEach(cell => {
-        sectors[cell.p] = image[cell.i][cell.j]; //zeroes copied too, still falsy
-        //all dot ks are >0, different, unblocked, and at same distance (save fudge)
+        if (image[cell.i][cell.j]) addKTo(image[cell.i][cell.j],dotKs); 
+        //all image dot ks are >0, different, unblocked, and at same distance (save fudge)
     });
     
-    for (let lev = 1;lev<=topLevel;lev++) children(i,j,lev).forEach(child=> {
-            if (!sectors[child.p]) sectors[child.p] = kOfClosest(child);
-            //sectors[child.p] = closerOf2Ks(sectors[child.p],kOfClosest(child));
+    // firstLev is first level where something is found,
+    // do one more level (if possible) thus adding in the closest dot in any of all 8 directions.
+    var firstLev = dotKs.length?0:1000;
+    for (let lev = 1;lev<=topLevel;lev++) {
+        children(i,j,lev).forEach(child => {
+            let k = kOfClosest(child);
+            if (k) {
+                if (firstLev == 1000) firstLev = lev;
+                addKTo(k,dotKs);
+            }
         });
-        
-    return sectors;
+        if (lev == firstLev + 1) break; // have added in closest in each of 8 directions examined
+    }
     
-}
-
-   
-function sectorKs(sectors){
-    var ks = [];
-    sectors.forEach(k => { if (k && ks.indexOf(k)<0) ks.push(k); });
-    return ks;
+    return dotKs;
+    
 }
     
 //a visit, for Delaunay
 function closets(i,j,levl) {
     
-    var sectors = taprootScan(i,j,levl); 
-    
-    var ks = sectorKs(sectors);
+    var ks = taprootScan(i,j,levl); 
     
     if (ks.length == 0) return false; //leave pyr[i][j] contents zero
-    else if (ks.length == 1) pyr[i][j] = ks[0];
+    else if (ks.length == 1) { var z = ks[0]*2; pyr[i][j] = z/2; } //pyr[i][j] = ks[0];
     else { 
         pyr[i][j] = -dotSets.length; dotSets.push(ks);
         linkClosestPair(i,j,ks); // wrap(ks) produces more links
@@ -658,28 +639,27 @@ function closets(i,j,levl) {
     return ks; //is truthy, could be useful for trace
     
 }
- 
     
 //A visit, for voronoi
-//fill in lower levels top down, with closest dot(s) they or their parent know of
+//fill in lower levels top down, with closest dot(s) they or their parents know of, per sector
 function stronger(i,j,level){
     var dotKs;
     
-    function fillChild(ci,cj,arr){
+    function fillChild(child,arr){
         
         function closestDotKs(dotKs){
-            var leastD2 = minD2(ci,cj,dotKs);
+            var leastD2 = minD2(child.i,child.j,dotKs);
             var closestKs = [ leastD2.k ];
             for (let m=0; m<dotKs.length; m++) {
-                if (m != leastD2.m && d2(ci,cj,dots[dotKs[m]].i,dots[dotKs[m]].j) == leastD2.d2) closestKs.push(dotKs[m]);
+                if (m != leastD2.m && d2(child.i,child.j,dots[dotKs[m]].i,dots[dotKs[m]].j) == leastD2.d2) closestKs.push(dotKs[m]);
             }
             return closestKs;
         }
         
-        let tempSet = addValTo(arr[ci][cj],dotKs.slice());
+        let tempSet = addValTo(arr[child.i][child.j],dotKs.slice());
         let cloSet = closestDotKs(tempSet);
-        if (cloSet.length == 1) arr[ci][cj] = cloSet[0];
-        else { arr[ci][cj] = -dotSets.length; dotSets.push(cloSet);}
+        if (cloSet.length == 1) arr[child.i][child.j] = cloSet[0];
+        else { arr[child.i][child.j] = -dotSets.length; dotSets.push(cloSet);}
     }
     
     var n = pyr[i][j];
@@ -688,8 +668,8 @@ function stronger(i,j,level){
         if (n>0) dotKs = [n];
         else dotKs = dotSets[-n];
         
-        if (level == 0) cellChildren(i,j).forEach(child => { fillChild(child.i,child.j, image); });
-        else          children(i,j,level).forEach(child => { fillChild(child.i,child.j, pyr ); });
+        if (level == 0) cellChildren(i,j).forEach(child => { fillChild(child, image); });
+        else          children(i,j,level).forEach(child => { fillChild(child, pyr ); });
 
         return 1;
     } else return 0;
@@ -724,9 +704,12 @@ function delaunay(givenDots){
     clearRGBA();
     clearContext();
     traceControl = TRACENONE;
+    linkCount = 0;
     
     seedImage(givenDots);
     indexUp(closets, 0, 100);
+    
+   // console.log('linkCount = ',linkCount,'  dotSets.length = ',dotSets.length);
 }
 
     
@@ -954,18 +937,17 @@ function drawBetween(i1,j1,i2,j2,rgbString){
     imgContext.strokeStyle = overrideColor?overrideColor:rgbString;
     imgContext.stroke();
 }
-
-function drawLink(k1,k2){
-    drawBetween(dots[k1].i,dots[k1].j,dots[k2].i,dots[k2].j,'Black');
-}
+    
 // graph generation
+var linkCount = 0;
 function linkClosestPair(i,j,dotKs){
     if (dotKs.length < 2 ) return;
+    linkCount+= dotKs.length;
     var copy = dotKs.slice();
     var first = minD2(i,j,copy);
     copy.splice(first.m,1); //remove first.k
     var second = minD2(i,j,copy);
-    drawLink(first.k,second.k);
+    drawBetween(dots[first.k].i,dots[first.k].j,dots[second.k].i,dots[second.k].j,'Black');
 }
 
 //assumes dotKs.length >= 1
@@ -1000,9 +982,11 @@ function renderImageKs(){
 }
     
 function getIndexLevel(){return indexLevel;}
+function getLinkCount(){return linkCount;}
     
 return { 
         getIndexLevel:getIndexLevel,
+        getLinkCount:getLinkCount,
         d2:d2,
         d2ToChildren:d2ToChildren,
         d2BetweenAdjacentChildren:d2BetweenAdjacentChildren,
