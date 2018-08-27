@@ -4,7 +4,7 @@
 <!--
 index.html
 
-Copyright 2018 John R C Fairfield, MIT license
+Copyright 2018 John R C Fairfield, see MIT license
     
 Put the two files index.html and ckrbd.js in a folder (directory) and
 open index.html in the Chrome browser.
@@ -54,8 +54,9 @@ Be advised, this testbed is not user friendly and has been tested only in Chrome
 Mode: <select id = 'selectMode', onChange="schedule(this.value);">
 <option value='foot' >footprints</option>
 <option value='head' >headprints</option>
-<option value='dela'>Delaunay-like</option>
+<option value='clos'>closest dot</option>
 <option value='voro'>Voronoi-like</option>
+<option value='dela'>Delaunay-like</option>
 </select>
     
 <p>
@@ -89,6 +90,7 @@ function schedule(val){
     if (val == 'foot') footprintsMode();
     else if (val == 'head') headprintsMode();
     else if (val == 'dela') DelaunayLikeMode();
+    else if (val == 'clos') closestDotMode();
     else if (val == 'voro') VoronoiLikeMode();
 }
     
@@ -108,6 +110,13 @@ function headprintsMode(){
 
 function DelaunayLikeMode(){
     mode = "Delaunay-like";
+    instructions.innerHTML = 
+    "<br>";
+    doMode();
+}
+
+function closestDotMode(){
+    mode = "closest dot";
     instructions.innerHTML = 
     "<br>";
     doMode();
@@ -145,6 +154,10 @@ function doDelaunay(dots){
     cb.delaunay(dots);
 }
     
+function doClosestDot(dots){
+    cb.closestDot(dots);
+}
+    
 function doVoronoi(dots){
     cb.voronoi(dots); 
     cb.renderImageKs();
@@ -166,6 +179,7 @@ function doMode(){
         case "footprints": doFootprints(startingCells); break;
         case "headprints": doHeadprints(startingCells); break;
         case "Delaunay-like": doDelaunay(startingCells); break;
+        case "closest dot": doClosestDot(startingCells); break;
         case "Voronoi-like": doVoronoi(startingCells);  break;
     }
     
@@ -405,14 +419,6 @@ function pageFullyLoaded(e) {
             if (mouseDownPos) {
                 mouseMovePos = null;
                 return; //mouseMoves, doModes, traceProvenance all blocked during drag
-            }
-            
-            if (shiftFlag) { 
-                mouseMovePos = null;
-                doMode();
-                cb.drawNet();
-                cb.traceProvenance(mmp.i,mmp.j); //after doMode and drawNet, recolors parts of them
-                return;//mouseMoves blocked during shift
             }
             
             mouseMovePos = mmp;
