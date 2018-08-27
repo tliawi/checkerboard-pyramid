@@ -1,7 +1,7 @@
 /*
 ckrbd.js
 
-Copyright 2018 John R C Fairfield, MIT License
+Copyright 2018 John R C Fairfield, see MIT License
     
 Download, and put the two files index.html and ckrbd.js in a folder (directory) and
 open index.html in the Chrome browser.
@@ -71,9 +71,8 @@ for (let i=0;i<pyrHeight;i++) pyr[i] = (new Array(pyrWidth)).fill(0);
 // Note that neither dots[0] nor dotSets[0] is ever used, they're throwaway so that k's are "truthy"
 // and 0 can represent the empty set.
 
-// Dots that have the same image coordinates could be represented by adding a weight to the dots array indicating
-// how many dots are at this position. But since the number of dots is irrelevant for this code (the weights
-// would be ignored) I don't bother (see seedImage()). Extra dots having the same image coordinates are ignored.
+// If there are multiple dots having the same image coordinates, they are treated as one dot--this code does not
+// examine below the pixel level.
     
 //Section 1. This first section of code is independent of the distinction SUMS|SETS ------------------------------
 
@@ -393,7 +392,7 @@ function indexDn(visit, topLevel, botLevel){
 // In this section pyr is not used. Rather the pyramid is 'searched' implicitly using pyr coordinates without ever referring
 // to pyr contents.
     
-// The following function puts the footprint of a given node into image.
+// The following function puts the weighted footprint of a given node into image.
     
 // lvl must be level(i,j), implying it will always be >=0
 // Counts the number of ways dfs can get to each cell from a given node.
@@ -419,10 +418,10 @@ function cellHeightFirstMarkup(iImage,jImage,topLevel){
 // the node given in i,j, which is coordinates of a pyramid intersection, not an image cell.
 // lvl must be level(i, j), and must be <= topLevel
 function heightFirstMarkup(i, j, lvl, topLevel){
-    if (lvl >= topLevel) {
+    if (lvl >= topLevel) {//mark surrounding image
         cellChildren(i,j).forEach(cell=> { 
             image[cell.i][cell.j]++;
-        }); //mark surrounding image
+        }); 
     } else {
         parents(i,j,lvl).forEach(node=>heightFirstMarkup(node.i, node.j, lvl+1, topLevel));
     }
@@ -478,7 +477,7 @@ function footprint(i,j){
 }   
 
 
-//Entry point for plusLevel headprints of givendots.
+//Entry point for plusLevel headprints of givendots. To see results, follow with portrayLevel(plusLevel)
 function headprints(givenDots, plusLevel){ 
     if (plusLevel <0) return;
     dots = givenDots;
@@ -507,6 +506,12 @@ function footprints(givenDots, plusLevel){
 
 
 // 3.a SET infrastructure
+    
+function unionKs(aKs,bKs){
+    var u = aKs.slice();
+    bKs.forEach(k=>{ if(u.indexOf(k)<0)u.push(k); });
+    return u;
+}
     
 //translates a pyramid value into a set of ks, i.e. indices into dots array
 function ksFromPyrVal(v){
@@ -561,26 +566,103 @@ var traceControl = TRACENONE;
 // if TRACENONE don't draw sources
 // if TRACESOURCES draw from node to sources a random color dependent on node
 // if TRACEDOTS, draw lines from node to known dots a random color dependent on node
+    
+//a visit, for closest dot precursor to Voronoi
+//all pyr values are 0 or positive, there is no use of dotSets. Very minimal information.
+function taprootClosest(i,j,topLevel){
+    
+    var dotKs = [];
+    
+    function traceDisplay(k, source){ //for tracing display only, is inconsequential to calculation
+       if (traceControl && k) { //display tracing sources
+            if (traceControl == TRACESOURCES) drawBetween(i,j,source.i,source.j,randomRGBString(i*pyrWidth+j));
+            else drawBetween(i,j,dots[k].i,dots[k].j,randomRGBString(i*pyrWidth+j)); //TRACEDOTS
+        } 
+    }
+    
+    //Level 0 gets special treatment because sources are all in image, not pyr
+    cellChildren(i,j).forEach(cell => {
+        if (image[cell.i][cell.j]) addKTo(image[cell.i][cell.j],dotKs); 
+        //all image dot ks are >0, different, unblocked, and at same distance (save fudge)
+    });
+    
+    // firstLev is first level where something is found,
+    // do one more level (if possible) thus adding in the closest dot in any of all 8 directions.
+    var firstLev = dotKs.length?0:1000;
+    for (let lev = 1;lev<=topLevel;lev++) {
+        children(i,j,lev).forEach(child => {
+            let k = pyr[child.i][child.j];
+            if (k) {
+                traceDisplay(k,child);
+                if (firstLev == 1000) firstLev = lev;
+                addKTo(k,dotKs);
+            }
+        });
+        if (lev == firstLev + 1) break; // have added in closest in each of 8 directions examined
+    }
+    
+    if (dotKs.length) {
+        pyr[i][j] = minD2(i,j,dotKs).k;
+        let d = dots[pyr[i][j]];
+        drawBetween(i,j,d.i,d.j,randomRGBString(i*pyrWidth+j));
+        return 1;
+    } else return 0;
+}
+    
+//a visit, for second part of Voronoi after closest dot
+//all pyr values are 0 or positive, there is no use of dotSets.
+function taprootRedux(i,j,topLevel){
+    
+    var k = pyr[i][j];
+    if (k){
+        for (let lev = topLevel;lev>0;lev--) { //go down (or up, doesn't matter) taproot, spreading info about k
+            children(i,j,lev).forEach(child => {
+                let ck = pyr[child.i][child.j]; //by assumption of reduction, is 0 or a positive k
+                if (ck == 0) pyr[child.i][child.j] = k;
+                else {
+                    let d2K = d2(child.i,child.j,dots[k].i,dots[k].j);
+                    let d2Ck = d2(child.i,child.j,dots[ck].i,dots[ck].j)
+                    if (d2K < d2Ck) pyr[child.i][child.j] = k;
+                }
+            });
+        }
+        
+        //level 0 gets special treatment
+        cellChildren(i,j).forEach(cell => {
+            let ck = image[cell.i][cell.j];
+            if (ck == 0) image[cell.i][cell.j] = k;
+            else {
+                let d2K = d2(cell.i,cell.j,dots[k].i,dots[k].j);
+                let d2Ck = d2(cell.i,cell.j,dots[ck].i,dots[ck].j)
+                if (d2K < d2Ck) image[cell.i][cell.j] = k;
+            }
+        });
+        
+        return 1;
+    } else return 0;
+}
 
     
-/*  Justifications of Delaunay-like algorithm:
+function linkAll(dotKs){
+    for (let m=0;m<dotKs.length;m++)for (let n = m+1;n<dotKs.length;n++) {
+        drawBetween(dots[dotKs[m]].i,dots[dotKs[m]].j,dots[dotKs[n]].i,dots[dotKs[n]].j,'Black');
+    }
+}
+    
+//for voronoi-based Delaunay, used only on level 0
+//examines a level 0 node's children, given that Voronoi has already defined all cells
+function DelaunayFromVoronoi(i,j){
+    links = [];
+    var dotKs = [];
+    cellChildren(i,j).forEach(cell => addKTo(image[cell.i][cell.j],dotKs));
+    if (dotKs.length>1) wrap(dotKs);
+}
 
-We want to pass as much information up the pyramid as needed, but as little as necessary. In particular the amount of data must not grow combinatorially with level, like it would if we retained at each node the list of all dots in the footprint of that node. 
-
-All nodes in the taproot of a given node N are in one of 8 directions (N, S, E W or NE NW SW SE) from N. Clumping all taproot nodes in a given direction p together into what is called a "sector", N retains only the closest dot it finds in each sector. Searching up the taproot from the bottom (nearest) level, the closest dot in a sector should be found in the first non-empty node of that sector that is searched.
-
-Each node thus ends up retaining 0 to at most 8 dots. If a node retains 2 or more dots, it links the two dots that are closest to it. This is what produces the Delaunay-like result.
-
-This does two things: it puts an upper limit on the amount of data retained at a node, AND it solves the bursting problem.
-
-The bursting problem: one would like the result from a given dot pattern to be very similar to that given dot pattern where each dot is surrounded by a burst of dots very close to it, a tiny clump of dots. Each burst of dots should be linked together of course, but then there should also be links between the bursts that are analagous to the links between the dots of the original pattern. Given that the algorithm only pays attention to the closest dot in each sector, that closest dot blocks the presence of other dots in the burst behind it. If those dots were included, the "closest two dots" to any given node would nearly invariably be from the same burst, and links between bursts would be exceedingly rare, dependent on there being a node so close to the bisector between the bursts that its closest two dots would be one from each burst.
-
-*/
-
+//for Delaunay
 //taprootScan starts at level 0 and works up towards topLevel (included).
-//At each level it examines the taproot nearest children at that level,
-//retaining the closest nodes in each sector. It quits at topLevel, or at the level one higher than the level at which
-//data is first found, so that all 8 sectors have been examined.
+//At each level it examines the taproot nearest children at that level (collectively called 'sources'),
+//retaining the closest node in each source. It quits at topLevel, or at the level one higher than the level at which
+//data is first found, so that all 8 directions have been examined at the scale of the nearest dot.
 function taprootScan(i,j,topLevel){
     
     var dotKs = [];
@@ -623,58 +705,7 @@ function taprootScan(i,j,topLevel){
     return dotKs;
     
 }
-    
-//a visit, for Delaunay
-function closets(i,j,levl) {
-    
-    var ks = taprootScan(i,j,levl); 
-    
-    if (ks.length == 0) return false; //leave pyr[i][j] contents zero
-    else if (ks.length == 1) { var z = ks[0]*2; pyr[i][j] = z/2; } //pyr[i][j] = ks[0];
-    else { 
-        pyr[i][j] = -dotSets.length; dotSets.push(ks);
-        linkClosestPair(i,j,ks); // wrap(ks) produces more links
-    }
-    
-    return ks; //is truthy, could be useful for trace
-    
-}
-    
-//A visit, for voronoi
-//fill in lower levels top down, with closest dot(s) they or their parents know of, per sector
-function stronger(i,j,level){
-    var dotKs;
-    
-    function fillChild(child,arr){
-        
-        function closestDotKs(dotKs){
-            var leastD2 = minD2(child.i,child.j,dotKs);
-            var closestKs = [ leastD2.k ];
-            for (let m=0; m<dotKs.length; m++) {
-                if (m != leastD2.m && d2(child.i,child.j,dots[dotKs[m]].i,dots[dotKs[m]].j) == leastD2.d2) closestKs.push(dotKs[m]);
-            }
-            return closestKs;
-        }
-        
-        let tempSet = addValTo(arr[child.i][child.j],dotKs.slice());
-        let cloSet = closestDotKs(tempSet);
-        if (cloSet.length == 1) arr[child.i][child.j] = cloSet[0];
-        else { arr[child.i][child.j] = -dotSets.length; dotSets.push(cloSet);}
-    }
-    
-    var n = pyr[i][j];
-    if (n) { //n==0 means parent has nothing to contribute to children, leave them alone
-       
-        if (n>0) dotKs = [n];
-        else dotKs = dotSets[-n];
-        
-        if (level == 0) cellChildren(i,j).forEach(child => { fillChild(child, image); });
-        else          children(i,j,level).forEach(child => { fillChild(child, pyr ); });
-
-        return 1;
-    } else return 0;
-}
-
+          
 // 3.b SET entry points
     
 function fudge(i){
@@ -694,10 +725,10 @@ function seedImage(givenDots){
         dots.push({i:fudge(givenDots[k].i), j:fudge(givenDots[k].j)}); //move dots to pyr coordinate framework
     } 
 }
-    
-//Entry point for Delaunay-like
-function delaunay(givenDots){
-    
+ 
+//All k are 0 or positive, i.e. all sets empty or singletons
+//Entry point for closest dot
+function closestDot(givenDots){
     dotSets = [[]]; //first one ignored
     clearImage();
     clearPyr();
@@ -707,19 +738,24 @@ function delaunay(givenDots){
     linkCount = 0;
     
     seedImage(givenDots);
-    indexUp(closets, 0, 100);
+    indexUp(taprootClosest, 0, 100);
     
-   // console.log('linkCount = ',linkCount,'  dotSets.length = ',dotSets.length);
 }
 
-    
+//All k are 0 or positive, i.e. all sets empty or singletons
 //Entry point for Voronoi-like
 function voronoi(givenDots){
-    delaunay(givenDots);
-    indexDn(stronger,indexLevel-1,0);
+    closestDot(givenDots);
+    indexDn(taprootRedux, indexLevel-1,0);
 }
 
 
+//uses dotSets, i.e. some k are negative and indicate sets of more than one point
+//Entry point for Delaunay-like
+function delaunay(givenDots){
+    voronoi(givenDots);
+    indexALevel(DelaunayFromVoronoi,0);
+}
     
 // Visualizations and tests  ____________________________________________________________________________________
     
@@ -894,12 +930,6 @@ function randomRGBString(aSeed){
 }
 
     
-function drawNet(trcCntrl = TRACESOURCES){
-    traceControl = trcCntrl;
-    indexUp(closets,1,100);
-}
-
-    
 //returns coords of valid pyr node nearest to i,j, or null if none found within window of radius r.
 function scanWindow(i,j,r){
     var nearii,nearjj;
@@ -919,15 +949,6 @@ function scanWindow(i,j,r){
     if (nearii >=0) return {i:nearii,j:nearjj}; else return null;
 }
 
-    
-function traceProvenance(i,j){
-    var node=scanWindow(i,j,10);
-    if (node) {
-        overrideColor = 'Red';
-        console.log("trace ",node.i, node.j, level(node.i,node.j), closets(node.i,node.j, level(node.i,node.j)));
-        overrideColor = '';
-    }
-}
  
 //rgbString is randomRGBSting(something) or cyclicColor(something) etc
 function drawBetween(i1,j1,i2,j2,rgbString){
@@ -1012,10 +1033,9 @@ return {
         greyLevel:greyLevel,
         portrayLevel:portrayLevel,
         delaunay:delaunay,
+        closestDot:closestDot,
         voronoi:voronoi,
         renderImageKs:renderImageKs,
-        drawNet:drawNet,
-        traceProvenance:traceProvenance,
         scanWindow:scanWindow,
     };
 }
