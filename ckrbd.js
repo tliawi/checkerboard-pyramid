@@ -618,20 +618,20 @@ function DelaunayFromVoronoi(i,j){
 
 
           
-// 3.b SET entry points
-    
-function fudge(i){
-    //the first 0.5 moves dots to pyr coordinate framework.
-    //the last term prevents equal distance evaluations from being probable,
-    //so that there is (nearly) always a unique answer to questions like "what is the closest dot?".
-    return i + 0.5 + 0.001*(Math.random()-0.5); 
-}
-    
+// 3.b POINT entry points 
     
 //seed image with truthy dot locations. Overwrites multiple dots at same location.
-//ignores dots[0], so all dots indices are positive
 function seedImage(givenDots){
-    dots = [ {i:0,j:0}]; //first one ignored
+    
+    function fudge(n){
+        //the first 0.5 moves dots to pyr coordinate framework.
+        //the last term prevents equal distance evaluations from being probable,
+        //so that there is (nearly) always a unique answer to questions like "what is the closest dot?".
+        //return n + 0.5 + 0.001*(nextRandom(n)-0.5); //use to freeze jitter caused by fudge
+        return n + 0.5 + 0.001*(Math.random()-0.5);
+    }
+   
+    dots = [ {i:0,j:0}]; //first one will be ignored
     for (let k=1;k<givenDots.length;k++){
         image[givenDots[k].i][givenDots[k].j] = k; //givendots values are integers
         dots.push({i:fudge(givenDots[k].i), j:fudge(givenDots[k].j)}); //move dots to pyr coordinate framework
@@ -775,7 +775,8 @@ function dumpLine(a,b){
 function stLine(a, b){
     
     //for (var index=0; true; index++) print( dither(p,index) );
-    //produces a sequence of 0's and 1's, where the probability of 1's is p, and the 1's are //uniformly dithered, that is, they are spread out as uniformly as possible.
+    //produces a sequence of 0's and 1's, where the probability of 1's is p, and the 1's are 
+    //uniformly dithered, that is, they are spread out as uniformly as possible.
     function dither(p,index) { return Math.floor((index+1)*p) == Math.floor(index*p)?0:1; }
     
     var di = a.i < b.i? 1:-1;
