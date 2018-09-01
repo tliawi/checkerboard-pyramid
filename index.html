@@ -108,12 +108,6 @@ function headprintsMode(){
     doMode();
 }
 
-function DelaunayLikeMode(){
-    mode = "Delaunay-like";
-    instructions.innerHTML = 
-    "<br>";
-    doMode();
-}
 
 function closestDotMode(){
     mode = "closest dot";
@@ -125,9 +119,18 @@ function closestDotMode(){
 function VoronoiLikeMode(){
     mode = "Voronoi-like";
     instructions.innerHTML = 
-    "<br>";
+    "<br><strong>v</strong>: hold for 4-scan voronoi 'standard'<br>";
     doMode();
 }
+
+
+function DelaunayLikeMode(){
+    mode = "Delaunay-like";
+    instructions.innerHTML = 
+    "<br><strong>v</strong>: hold for 4-scan voronoi 'standard'<br>";
+    doMode();
+}
+    
     
 function writeMessage(message) {
     document.getElementById("msgDiv").innerHTML = message;
@@ -150,20 +153,20 @@ function doHeadprints(dots){
     cb.renderImageToRGBA(1); 
 }
 
-function doDelaunay(dots){
-    cb.delaunay(dots);
-}
-    
+       
 function doClosestDot(dots){
     cb.closestDot(dots);
 }
     
+function doDelaunay(dots){
+    cb.delaunay(dots, vFlag);
+}
+ 
 function doVoronoi(dots){
-    cb.voronoi(dots); 
+    cb.voronoi(dots, vFlag); 
 }
    
 
-    
 function doMode(){
     
     var didPush = false;
@@ -212,6 +215,7 @@ var cb, myCanvas;
 var startingCells = [{i:0,j:0}]; //startingCells[0] is ignored. Within cb, want all references to dots to be truthy, not 0.
 var spaceToggle = false;
 var shiftFlag = false;
+var vFlag = false;
 var animationFlag = false;
 var mode = "footprints";
 var didj = []; //speed vectors for animation
@@ -346,6 +350,16 @@ function onShiftUp(){
     writeMessage("");
     doMode();
 }
+    
+function onVDown(){
+    vFlag = true;
+    if (!animationFlag) doMode();
+}
+    
+function onVUp(){
+    vFlag = false;
+    if (!animationFlag) doMode();
+}
 
 function repeatAnimation(t){
     animateOneStep();
@@ -436,6 +450,7 @@ function pageFullyLoaded(e) {
         if      (event.key == ">") { plusLevel++; onShiftDown(); }
         else if (event.key == "<") { if (plusLevel>0) plusLevel--; onShiftDown(); }
         else if (event.key == "Shift") onShiftDown();
+        else if (event.key == "v") onVDown();
     }
     
     
@@ -458,6 +473,7 @@ function pageFullyLoaded(e) {
         else if (event.key == "t") addRandomDots(1000);
         
         else if (event.key == "Shift") onShiftUp();
+        else if (event.key == "v") onVUp();
         
         return false;
     }

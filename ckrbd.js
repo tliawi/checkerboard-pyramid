@@ -609,6 +609,7 @@ function taprootRedux(i,j,topLevel){
 
     
 //for voronoi-based Delaunay, used only on level 0
+//does not use pyr, only image
 //examines a level 0 node's children, given that Voronoi has already defined all cells
 function DelaunayFromVoronoi(i,j){
     var dotKs = [];
@@ -652,20 +653,84 @@ function closestDot(givenDots){
 
 
 //Entry point for Voronoi-like
-function voronoi(givenDots){
-    closestDisplay = 0;
-    closestDot(givenDots);
-    closestDisplay = 1;
-    indexDn(taprootRedux, indexLevel-1,0);
+function voronoi(givenDots, standard){
+    if (standard) flatVoro(givenDots);
+    else {
+        closestDisplay = 0;
+        closestDot(givenDots);
+        closestDisplay = 1;
+
+        indexDn(taprootRedux, indexLevel-1,0);
+    }
     
     renderImageKs();
 }
 
 //Entry point for Delaunay-like
-function delaunay(givenDots){
-    voronoi(givenDots);
+function delaunay(givenDots, standard){
+    voronoi(givenDots, standard);
     indexALevel(DelaunayFromVoronoi,0);
 }
+    
+// Non pyramid 4 pass standard -------------------------------------------------------------
+
+function flatVoro(givenDots){
+    clearImage();
+    clearRGBA();
+    clearContext();
+    
+    seedImage(givenDots);
+    sweep4(); //propagates ks through image
+}
+    
+function sweep4(){
+    
+    var k;
+    
+    function update(i,j){
+        let localK = image[i][j];
+        if (localK) {
+            if (d2(dots[k].i,dots[k].j,i,j) < d2(dots[localK].i,dots[localK].j,i,j)) image[i][j] = k;
+        } else image[i][j] = k;
+    }
+    
+    for (let i=0;i<imageHeight-1;i++)for (let j=0;j<imageWidth-1;j++){
+        k = image[i][j];
+        if (k){
+            update(i,  j+1); 
+            update(i+1,j  ); 
+            update(i+1,j+1);
+        }
+    }
+    
+    for (let i=imageHeight-1;i>0;i--) for (let j=imageWidth-1;j>0;j--){
+        k = image[i][j];
+        if (k){ 
+            update(i,  j-1); 
+            update(i-1,j  ); 
+            update(i-1,j-1);
+        }
+    }
+    
+    for (let i=imageHeight-1;i>0;i--) for (let j=0;j<imageWidth-1;j++){
+        k = image[i][j];
+        if (k){ 
+            update(i-1, j  ); 
+            update(i-1, j+1); 
+            update(i,   j+1);
+        }
+    }
+    
+    for (let i=0;i<imageHeight-1;i++) for (let j=imageWidth-1;j>0;j--){
+        k = image[i][j];
+        if (k){ 
+            update(i,   j-1); 
+            update(i+1, j  ); 
+            update(i+1, j-1);
+        }
+    }
+}
+
     
 // Visualizations and tests  ____________________________________________________________________________________
     
