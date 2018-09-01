@@ -119,7 +119,7 @@ function closestDotMode(){
 function VoronoiLikeMode(){
     mode = "Voronoi-like";
     instructions.innerHTML = 
-    "<br><strong>v</strong>: hold for 4-scan voronoi 'standard'<br>";
+    "<br><strong>v</strong>: hold for non-pyramidal voronoi comparison 'standard'<br>";
     doMode();
 }
 
@@ -127,7 +127,7 @@ function VoronoiLikeMode(){
 function DelaunayLikeMode(){
     mode = "Delaunay-like";
     instructions.innerHTML = 
-    "<br><strong>v</strong>: hold for 4-scan voronoi 'standard'<br>";
+    "<br><strong>v</strong>: hold for non-pyramidal voronoi comparison 'standard'<br>";
     doMode();
 }
     
@@ -234,10 +234,14 @@ function animateOneStep(dchange = 0.02){
     for (var k=1;k<startingCells.length; k++){
         let pos = startingCells[k];
         let speed = didj[k];
-        if (speed.i >= 0 && Math.random() < speed.i) pos.i++;
+        if (speed.i >= 0){ 
+            if (Math.random() < speed.i) pos.i++;
+        }
         else if ( Math.random() < -speed.i) pos.i--;
         
-        if (speed.j >= 0 && Math.random() < speed.j) pos.j++
+        if (speed.j >= 0){
+            if (Math.random() < speed.j) pos.j++
+        }
         else if ( Math.random() < -speed.j) pos.j--;
         
         if (pos.i < TBMargin) {
@@ -304,9 +308,8 @@ function toggleMargins(){
 }
 
 function randomCellIJ(){
-    return {i: TBMargin + Math.floor(Math.random()*(myCanvas.height-2*TBMargin)), j: LRMargin+Math.floor(Math.random()*(myCanvas.width-2*LRMargin))};
+    return {i: TBMargin + Math.random()*(myCanvas.height-2*TBMargin), j: LRMargin+ Math.random()*(myCanvas.width-2*LRMargin)};
 }
-
     
 function addRandomDots(n){
     for (let k=0;k<n;k++)startingCells.push(randomCellIJ());
@@ -352,8 +355,9 @@ function onShiftUp(){
 }
     
 function onVDown(){
+    let oldVFlag = vFlag;
     vFlag = true;
-    if (!animationFlag) doMode();
+    if (!animationFlag && !oldVFlag) doMode();
 }
     
 function onVUp(){

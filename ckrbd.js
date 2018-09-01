@@ -483,7 +483,7 @@ function headprints(givenDots, plusLevel){
     clearRGBA();
     
     //seed level 0
-    for (let km=1;km<dots.length;km++) cellsLevel0Parents(dots[km].i, dots[km].j).forEach(node=>{
+    for (let km=1;km<dots.length;km++) cellsLevel0Parents(Math.floor(dots[km].i), Math.floor(dots[km].j)).forEach(node=>{
         pyr[node.i][node.j]++;
     });
                         
@@ -548,7 +548,7 @@ function taprootClosest(i,j,topLevel){
     //Level 0 gets special treatment because sources are all in image, not pyr
     cellChildren(i,j).forEach(cell => {
         if (image[cell.i][cell.j]) addKTo(image[cell.i][cell.j],dotKs); 
-        //all image dot ks are >0, different, unblocked, and at same distance (save fudge)
+        //all image dot ks > 0 are different, unblocked.
     });
     
     // firstLev is first level where something is found,
@@ -623,19 +623,13 @@ function DelaunayFromVoronoi(i,j){
     
 //seed image with truthy dot locations. Overwrites multiple dots at same location.
 function seedImage(givenDots){
-    
-    function fudge(n){
-        //the first 0.5 moves dots to pyr coordinate framework.
-        //the last term prevents equal distance evaluations from being probable,
-        //so that there is (nearly) always a unique answer to questions like "what is the closest dot?".
-        //return n + 0.5 + 0.001*(nextRandom(n)-0.5); //use to freeze jitter caused by fudge
-        return n + 0.5 + 0.001*(Math.random()-0.5);
-    }
    
     dots = [ {i:0,j:0}]; //first one will be ignored
     for (let k=1;k<givenDots.length;k++){
-        image[givenDots[k].i][givenDots[k].j] = k; //givendots values are integers
-        dots.push({i:fudge(givenDots[k].i), j:fudge(givenDots[k].j)}); //move dots to pyr coordinate framework
+        //note: if multiple dots land in the same cell this retains only the last one.
+        //Arguably one should retain the one closest to the midpoint of the cell.
+        image[Math.floor(givenDots[k].i)][Math.floor(givenDots[k].j)] = k; //givendots values are integers
+        dots.push({i:givenDots[k].i+0.5, j:givenDots[k].j+0.5}); //save dots in pyr coordinate framework
     } 
 }
  
@@ -651,17 +645,19 @@ function closestDot(givenDots){
     indexUp(taprootClosest, 0, 100);
 }
 
+function pyrVoro(givenDots){
+    closestDisplay = 0; //turn off closestDot display
+    closestDot(givenDots);
+    closestDisplay = 1;
+
+    indexDn(taprootRedux, indexLevel-1,0);
+}
 
 //Entry point for Voronoi-like
 function voronoi(givenDots, standard){
+    
     if (standard) flatVoro(givenDots);
-    else {
-        closestDisplay = 0;
-        closestDot(givenDots);
-        closestDisplay = 1;
-
-        indexDn(taprootRedux, indexLevel-1,0);
-    }
+    else pyrVoro(givenDots);
     
     renderImageKs();
 }
@@ -672,8 +668,9 @@ function delaunay(givenDots, standard){
     indexALevel(DelaunayFromVoronoi,0);
 }
     
-// Non pyramid 4 pass standard -------------------------------------------------------------
-
+    
+// Non pyramid 4 pass standard voronoi calculation -----------------------------------------------------------
+    
 function flatVoro(givenDots){
     clearImage();
     clearRGBA();
