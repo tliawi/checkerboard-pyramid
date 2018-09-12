@@ -635,32 +635,69 @@ function taprootRedux(i,j,topLevel){
     } else return 0;
 }
 
+//a visit, for second part of Voronoi after closest dot.
+function GERedux(i,j,levl){
+    
+    var k = pyr[i][j];
+    
+    if (k){
+        if (levl == 0) {//level 0 gets special treatment
+            
+            cellChildren(i,j).forEach(cell => {
+                let ck = image[cell.i][cell.j];
+                if (ck == 0) image[cell.i][cell.j] = k;
+                else {
+                    let d2K = d2(cell.i,cell.j,dots[k].i,dots[k].j);
+                    let d2Ck = d2(cell.i,cell.j,dots[ck].i,dots[ck].j)
+                    if (d2K < d2Ck) image[cell.i][cell.j] = k;
+                }
+            });
+            
+        } else {
+            
+            children(i,j,levl).forEach(child => {
+                let ck = pyr[child.i][child.j];
+                if (ck == 0) pyr[child.i][child.j] = k;
+                else {
+                    let d2K = d2(child.i,child.j,dots[k].i,dots[k].j);
+                    let d2Ck = d2(child.i,child.j,dots[ck].i,dots[ck].j)
+                    if (d2K < d2Ck) pyr[child.i][child.j] = k;
+                }
+            });
+            
+        }
+        
+        return 1;
+    } else return 0;
+}
+    
 //a visit
 function GEClosest(i,j,levl){
     
     var bestK = pyr[i][j];
-    var bestD2 = bestK?d2(i,j,dots[bestK].i,dots[bestK].j):Number.MAX_VALUE;
+    var bestD2 = Number.MAX_VALUE;
     
-    function updateBest(ci,cj,arr){
-        let thisK = arr[ci][cj];
+    function updateBest(thisK){
         if (thisK){
-            let thisD2 = d2(i,j,dots[thisK].i,dots[thisK].j);
-            if (thisD2 < bestD2) {
-                bestD2 = thisD2;
-                bestK = thisK;
+            if (bestK==0) bestK = thisK;
+            else {
+                if (bestD2 == Number.MAX_VALUE) bestD2 = d2(i,j,dots[bestK].i,dots[bestK].j);
+                let thisD2 = d2(i,j,dots[thisK].i,dots[thisK].j);
+                if (thisD2 < bestD2) {
+                    bestD2 = thisD2;
+                    bestK = thisK;
+                }
             }
         }
     }
         
     //Level 0 gets special treatment because sources are all in image, not pyr
-    if (levl == 0) cellChildren(i,j).forEach(cell => updateBest(cell.i,cell.j,image) );
-    else children(i,j,levl).forEach(child => updateBest(child.i,child.j,pyr) );
-    
-    if (j==2 && (i==1 || i==2)) console.log(i,j,levl);
+    if (levl == 0) cellChildren(i,j).forEach(cell => updateBest(image[cell.i][cell.j]) );
+    else children(i,j,levl).forEach(child => updateBest(pyr[child.i][child.j]) );
     
     if (bestK && bestK != pyr[i][j]) {
         pyr[i][j] = bestK;
-        if (closestDisplay == 1) drawBetween(i,j,dots[bestK].i,dots[bestK].j,randomRGBString(levl));//levl*(i*pyrWidth+j)
+        if (closestDisplay == 1) drawBetween(i,j,dots[bestK].i,dots[bestK].j,cyclicColor(levl)); // randomRGBString(levl));//levl*(i*pyrWidth+j)
         return 1;
     } else return 0;
     
@@ -709,7 +746,8 @@ function pyrVoro(givenDots){
     closestDot(givenDots);
     closestDisplay = 1;
 
-    indexDn(taprootRedux, indexLevel-1,0);
+    //indexDn(taprootRedux, indexLevel-1,0);
+    indexDnGE(GERedux, indexLevel-1,0);
 }
 
 //Entry point for Voronoi-like
@@ -963,7 +1001,7 @@ function greyLevel(n){
 
 
 function cyclicColor(n){
-    var rgb =['DarkRed','Orange','Brown','Chartreuse','MediumTurquoise','DarkBlue','Magenta','Purple'];
+    var rgb =['Red','Orange','Brown','Chartreuse','MediumTurquoise','DarkBlue','Magenta','Purple'];
     return rgb[n%8];
 }
 
