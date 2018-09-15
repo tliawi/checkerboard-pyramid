@@ -331,6 +331,9 @@ function parents(i,j,level) {
 }
 
 // 1.f Indexing through the pyramid
+    
+
+var indexLevel;
 
 //Parameter “visit” below is a callback parameter, it must be a function 
 //that itself takes parameters (i,j,level).
@@ -359,7 +362,27 @@ function indexALevel(visit,level){
     return goOn;
 }
 
-var indexLevel;
+//calls visit(i,j,level) on every node of level >= given level >= 0
+function indexGELevel(visit,level){
+    let grndLevel = level-1;
+    let dsibs = hvDistBetweenSibs(grndLevel);
+    let halfdsibs = dsibs>>1;
+    let goOn = 0;
+
+    if (grndLevel&1){ //odd
+        for (let i=0; i<pyrHeight; i+=dsibs)
+            for (let j=0; j<pyrWidth; j+=dsibs) 
+                goOn += visit(i,j,level);
+    } else { //even
+        for (let i=0; i<pyrHeight; i+= halfdsibs) {
+            for (let j=((i/halfdsibs)&1)?halfdsibs:0; j<pyrWidth; j+=dsibs)
+                goOn += visit(i,j,level);  
+        }
+    }
+    
+    return goOn;
+}
+
     
 //Indexes through the whole pyramid hitting first all nodes at level botLevel, then level botLevel+1, level botLevel+2, etc..
 //IndexUp quits when an entire level finishes with no evidence 
@@ -379,8 +402,17 @@ function indexDn(visit, topLevel, botLevel){
     }
 }
     
-    
-    
+function indexUpGE(visit,botLevel,topLevel){
+    for (indexLevel = botLevel;indexLevel<=topLevel;indexLevel++){
+        if (indexGELevel(visit,indexLevel)==0) return;
+    }
+}
+
+function indexDnGE(visit, topLevel, botLevel){
+    for (indexLevel = topLevel;indexLevel>=botLevel;indexLevel--){
+        if (indexGELevel(visit,indexLevel)==0) return;
+    }
+}
     
 // Section 2. SUMS -------------------------------------------------------------------------------------------------------
 
@@ -427,10 +459,6 @@ function heightFirstMarkup(i, j, lvl, topLevel){
 
 // 2.b SUM visits ///////////////
     
-//a visit, to portray in image, a pyr node
-function markImage(i,j,level){
-    if (pyr[i][j]) cellChildren(i,j).forEach(cell => { image[cell.i][cell.j] = pyr[i][j];} ); //mark surrounding image
-}
 
 //a visit, for calculating weighted headprints
 function incParents(i,j,lvl){
@@ -607,6 +635,73 @@ function taprootRedux(i,j,topLevel){
     } else return 0;
 }
 
+//a visit, for second part of Voronoi after closest dot.
+function GERedux(i,j,levl){
+    
+    var k = pyr[i][j];
+    
+    if (k){
+        if (levl == 0) {//level 0 gets special treatment
+            
+            cellChildren(i,j).forEach(cell => {
+                let ck = image[cell.i][cell.j];
+                if (ck == 0) image[cell.i][cell.j] = k;
+                else {
+                    let d2K = d2(cell.i,cell.j,dots[k].i,dots[k].j);
+                    let d2Ck = d2(cell.i,cell.j,dots[ck].i,dots[ck].j)
+                    if (d2K < d2Ck) image[cell.i][cell.j] = k;
+                }
+            });
+            
+        } else {
+            
+            children(i,j,levl).forEach(child => {
+                let ck = pyr[child.i][child.j];
+                if (ck == 0) pyr[child.i][child.j] = k;
+                else {
+                    let d2K = d2(child.i,child.j,dots[k].i,dots[k].j);
+                    let d2Ck = d2(child.i,child.j,dots[ck].i,dots[ck].j)
+                    if (d2K < d2Ck) pyr[child.i][child.j] = k;
+                }
+            });
+            
+        }
+        
+        return 1;
+    } else return 0;
+}
+    
+//a visit
+function GEClosest(i,j,levl){
+    
+    var bestK = pyr[i][j];
+    var bestD2 = Number.MAX_VALUE;
+    
+    function updateBest(thisK){
+        if (thisK){
+            if (bestK==0) bestK = thisK;
+            else {
+                if (bestD2 == Number.MAX_VALUE) bestD2 = d2(i,j,dots[bestK].i,dots[bestK].j);
+                let thisD2 = d2(i,j,dots[thisK].i,dots[thisK].j);
+                if (thisD2 < bestD2) {
+                    bestD2 = thisD2;
+                    bestK = thisK;
+                }
+            }
+        }
+    }
+        
+    //Level 0 gets special treatment because sources are all in image, not pyr
+    if (levl == 0) cellChildren(i,j).forEach(cell => updateBest(image[cell.i][cell.j]) );
+    else children(i,j,levl).forEach(child => updateBest(pyr[child.i][child.j]) );
+    
+    if (bestK && bestK != pyr[i][j]) {
+        pyr[i][j] = bestK;
+        if (closestDisplay == 1) drawBetween(i,j,dots[bestK].i,dots[bestK].j,cyclicColor(levl)); // randomRGBString(levl));//levl*(i*pyrWidth+j)
+        return 1;
+    } else return 0;
+    
+}
     
 //for voronoi-based Delaunay, used only on level 0
 //does not use pyr, only image
@@ -642,7 +737,8 @@ function closestDot(givenDots){
     clearContext();
     
     seedImage(givenDots);
-    indexUp(taprootClosest, 0, 100);
+    //indexUp(taprootClosest, 0, 100);
+    indexUpGE(GEClosest,0,100);
 }
 
 function pyrVoro(givenDots){
@@ -650,7 +746,8 @@ function pyrVoro(givenDots){
     closestDot(givenDots);
     closestDisplay = 1;
 
-    indexDn(taprootRedux, indexLevel-1,0);
+    //indexDn(taprootRedux, indexLevel-1,0);
+    indexDnGE(GERedux, indexLevel-1,0);
 }
 
 //Entry point for Voronoi-like
@@ -757,8 +854,30 @@ function testParents(){
         parents(i,j,level(i,j)).forEach(parent => testPyrCoords(parent.i,parent.j));
 }
 
+//a visit, to portray in image, a pyr node
+function markImage(i,j,level){
+    if (pyr[i][j]) cellChildren(i,j).forEach(cell => { image[cell.i][cell.j] = pyr[i][j];} ); //mark surrounding image
+}
+
 function portrayLevel(level){
     indexALevel(markImage,level);
+}
+    
+    
+function markVisit(i,j,level){
+    cellChildren(i,j).forEach(cell=> { 
+            image[cell.i][cell.j]++;
+        })
+}
+    
+function testGELevel(level){
+    clearImage();
+    clearPyr();
+    clearRGBA();
+    clearContext();
+    
+    indexGELevel(markVisit,level);
+    renderImageToRGBA();
 }
  
 //returns sum of levels of nodes in a square pyramid width. 
@@ -882,7 +1001,7 @@ function greyLevel(n){
 
 
 function cyclicColor(n){
-    var rgb =['DarkRed','Orange','Brown','Chartreuse','MediumTurquoise','DarkBlue','Magenta','Purple'];
+    var rgb =['Red','Orange','Brown','Chartreuse','MediumTurquoise','DarkBlue','Magenta','Purple'];
     return rgb[n%8];
 }
 
@@ -983,11 +1102,13 @@ return {
         clearImage: clearImage,
         level:level,
         hvDistToParent:hvDistToParent,
+        hvDistBetweenSibs:hvDistBetweenSibs,
         sumLevels:sumLevels,
         depthFirstMarkup:depthFirstMarkup,
         footprint:footprint,
         footprints:footprints,
         headprints:headprints,
+        testGELevel:testGELevel,
         renderImageToRGBA:renderImageToRGBA,
         clearPyr:clearPyr,
         cellHeightFirstMarkup:cellHeightFirstMarkup,
