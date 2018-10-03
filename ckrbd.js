@@ -75,12 +75,12 @@ for (let i=0;i<pyrHeight;i++) pyr[i] = (new Array(pyrWidth)).fill(0);
 
 //1.a Clearing
     
-function clearImage(){
-    for (let i=0; i<imageHeight;i++) for (let j=0; j<imageWidth;j++) image[i][j]=0;
+function clearImage(z=0){
+    for (let i=0; i<imageHeight;i++) for (let j=0; j<imageWidth;j++) image[i][j]=z;
 }
     
-function clearPyr(){
-    for (let i=0;i<pyrHeight;i++) for (let j=0;j<pyrWidth;j++) pyr[i][j] = 0; 
+function clearPyr(z=0){
+    for (let i=0;i<pyrHeight;i++) for (let j=0;j<pyrWidth;j++) pyr[i][j] = z; 
 }
 
 function clearRGBA(){
@@ -458,8 +458,98 @@ function heightFirstMarkup(i, j, lvl, topLevel){
 
 
 // 2.b SUM visits ///////////////
-    
 
+    
+//childlvl must be >=0, doesn't work on image
+function hopUp(i,j,childlvl){
+    if (pyr[i][j] < 9999) { 
+        parents(i,j,childlvl).forEach(parent=>{pyr[parent.i][parent.j] = pyr[i][j]+1;});//==childlvl+2 ==level(parent.i,parent.j)+1
+        return pyr[i][j];
+    } else return 0;
+}
+
+function hopDn(i,j,lvl){
+    if (pyr[i][j] < 9999) {
+        if (lvl==0) cellChildren(i,j).forEach(cell=> image[cell.i][cell.j] = Math.min(pyr[i][j]+1, image[cell.i][cell.j]) );
+        else children(i,j,lvl).forEach(child=> pyr[child.i][child.j] = Math.min(pyr[i][j]+1, pyr[child.i][child.j]) );
+        return lvl;
+    }
+    else return 0;
+}
+
+// i,j in image coordinates
+function hopImage(i,j){
+    clearImage(9999);
+    clearPyr(9999);
+    clearRGBA();
+    
+    //seed level 0
+    image[i][j] = 0;
+    cellsLevel0Parents(i,j).forEach(parent=>{ pyr[parent.i][parent.j] = 1; }); //==level(parent.i,parent.j) + 1
+                        
+    indexUp(hopUp,0,100);
+    console.log(indexLevel);
+    indexDn(hopDn,indexLevel-1,0); //not indexLevel-1, shifting from childlvl up to parent lvl down
+    
+    renderImageToRGBA();
+}
+
+//take advantage of fact that headprint never has more than 7 nodes
+function intersection(a,b){
+    if (a.length && b.length) {
+        for (let n=0;n<a.length;n++) 
+            for (let m = 0;m<b.length;m++) if (a[n].i == b[m].i && a[n].j == b[m].j) return true;
+    }
+    return false;
+}
+    
+function parentsOf(cin,level) {
+    var cout = [];
+    cin.forEach(node=>parents(node.i,node.j,level).forEach(parent=>{
+        if (!intersection(cout,[parent])) cout.push(parent);
+    }));
+    return cout;
+}
+    
+function hopDistance(i,j,ii,jj){
+    
+    if (i==ii && j==jj) return 0;
+    
+    //if they meet on parents of level -1 == level 0, then (-1+2)*2 = two hops (one up, one down)
+    var c1 = cellsLevel0Parents(i,j);
+    var c2 = cellsLevel0Parents(ii,jj);
+    if (intersection(c1,c2)) return 2;
+    
+    //if they meet on parents of level levl = level levl+1, then (levl+2)*2 hops
+    for (var levl = 0;true;levl++) {
+        c1 = parentsOf(c1,levl);
+        c2 = parentsOf(c2,levl);
+        if (c1.length * c2.length == 0) return 0;
+        if (intersection(c1,c2)) return (levl+2)*2;
+    }
+}
+
+//as verification of hopDistance, a much slower way of calculating hopImage(i,j), results should be identical.
+function hopImage2(i,j){
+    for (var ii = 0; ii<imageHeight; ii++) {
+        for (var jj = 0; jj<imageWidth; jj++) image[ii][jj] = hopDistance(i,j,ii,jj);
+    }
+    renderImageToRGBA();
+}
+
+//sums hops between i,j and 100 random nodes in window whose top left is si,sj and of width==height = slength
+function sumHopDistance(i,j,si,sj,slength,shotSize) {
+    var sum=0;
+    for (var n=0;n<shotSize;n++) sum += hopDistance(i,j,si+Math.floor(Math.random()*slength),sj+Math.floor(Math.random()*slength) );
+    return sum;
+}
+    
+function avgHopDistance(i,j,si,sj,siLength,sjLength){
+    var sum=0;
+    for (var ii=si;ii<si+siLength;ii++) for (var jj=sj;jj<sj+sjLength;jj++) sum += hopDistance(i,j,ii,jj);
+    return sum/(siLength*sjLength);
+}
+    
 //a visit, for calculating weighted headprints
 function incParents(i,j,lvl){
   if (pyr[i][j]){ 
@@ -490,7 +580,7 @@ function clearnode(i,j){
 //Entry point for footprint of a given node.
 //cb.footprint(320,320) has the same effect on image as cb.depthFirstMarkup(320,320,level(320,320)), 
 //but uses pyr values and indexing with a visit function, rather than implicit dfs.
-//(You have to follow either by cb.renderImageToRGBA() to see the results).
+//(You have to follow with cb.renderImageToRGBA() to see the results).
 //For higher level nodes footprint() is a ton faster than depthFirstMarkup().
 function footprint(i,j){
     clearImage();
@@ -723,7 +813,7 @@ function seedImage(givenDots){
     for (let k=1;k<givenDots.length;k++){
         //note: if multiple dots land in the same cell this retains only the last one.
         //Arguably one should retain the one closest to the midpoint of the cell.
-        image[Math.floor(givenDots[k].i)][Math.floor(givenDots[k].j)] = k; //givendots values are integers
+        image[Math.floor(givenDots[k].i)][Math.floor(givenDots[k].j)] = k;
         dots.push({i:givenDots[k].i+0.5, j:givenDots[k].j+0.5}); //save dots in pyr coordinate framework
     } 
 }
@@ -1127,5 +1217,9 @@ return {
         voronoi:voronoi,
         renderImageKs:renderImageKs,
         scanWindow:scanWindow,
+        hopImage:hopImage,
+        hopImage2:hopImage2,
+        hopDistance:hopDistance,
+        avgHopDistance:avgHopDistance,
     };
 }
